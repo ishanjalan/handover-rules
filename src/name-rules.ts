@@ -46,7 +46,9 @@ export function isInSmartAnimateFrame(node: RuleNode): boolean {
   while (current && current.type !== 'PAGE' && current.type !== 'DOCUMENT') {
     if (
       (current.type === 'FRAME' || current.type === 'COMPONENT') &&
-      (current.parent?.type === 'PAGE' || current.parent?.type === 'DOCUMENT')
+      (current.parent === null ||
+       current.parent?.type === 'PAGE' ||
+       current.parent?.type === 'DOCUMENT')
     ) {
       topFrame = current;
       break;
