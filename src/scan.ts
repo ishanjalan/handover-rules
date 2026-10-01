@@ -278,6 +278,7 @@ function scanNodeInto(node: RuleNode, issues: Issue[]): void {
     node.type === 'GROUP' &&
     parent?.type === 'FRAME' &&
     parent.layoutMode !== 'NONE' &&
+    parent.layoutMode !== 'GRID' &&
     node.layoutPositioning !== 'ABSOLUTE' &&
     !node.isMask &&
     !node.children.some((c) => c.isMask) &&

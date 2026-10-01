@@ -292,3 +292,35 @@ describe('isDetachedInstance', () => {
     expect(isDetachedInstance(ruleNode({ type: 'FRAME' }))).toBe(false);
   });
 });
+
+describe('GRID layout frames are never dissolved', () => {
+  test('a GRID frame inside a GRID frame is not a passthrough', () => {
+    const child = ruleNode({ id: 'c', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG' });
+    const wrapper = ruleNode({
+      id: 'w', layoutMode: 'GRID',
+      layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', children: [child],
+    });
+    child.parent = wrapper;
+    const parent = ruleNode({ id: 'p', layoutMode: 'GRID', children: [wrapper] });
+    wrapper.parent = parent;
+    expect(isPassthroughFrame(wrapper)).toBe(false);
+  });
+
+  test('a single-child GRID frame is not redundant', () => {
+    const child = ruleNode({ id: 'c' });
+    const wrapper = ruleNode({ id: 'w', layoutMode: 'GRID', children: [child], x: 10, y: 10 });
+    child.parent = wrapper;
+    const parent = ruleNode({ id: 'p', layoutMode: 'NONE', width: 400, height: 400, children: [wrapper] });
+    wrapper.parent = parent;
+    expect(isRedundantFrame(wrapper)).toBe(false);
+  });
+
+  test('a redundant frame inside a GRID parent is left alone', () => {
+    const child = ruleNode({ id: 'c', x: 0, y: 0, width: 100, height: 100 });
+    const wrapper = ruleNode({ id: 'w', layoutMode: 'NONE', children: [child], width: 100, height: 100 });
+    child.parent = wrapper;
+    const parent = ruleNode({ id: 'p', layoutMode: 'GRID', children: [wrapper] });
+    wrapper.parent = parent;
+    expect(isRedundantFrame(wrapper)).toBe(false);
+  });
+});

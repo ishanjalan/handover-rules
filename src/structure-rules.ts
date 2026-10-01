@@ -58,6 +58,8 @@ export function isPassthroughFrame(node: RuleNode): boolean {
   if (node.type !== 'FRAME') return false;
 
   if (node.layoutMode === 'NONE') return false;
+  // Grid cells are positioned by row/column, not by flow — a grid wrapper is never a passthrough.
+  if (node.layoutMode === 'GRID') return false;
   if (node.children.length !== 1) return false;
   if (hasVisibleFill(node) || hasStroke(node) || hasEffects(node)) return false;
   if (node.opacity !== 1) return false;
@@ -187,6 +189,7 @@ export function isRedundantFrame(node: RuleNode): boolean {
   if (node.type !== 'FRAME') return false;
 
   if (node.children.length !== 1) return false;
+  if (node.layoutMode === 'GRID') return false;
 
   if (hasVisibleFill(node) || hasStroke(node) || hasEffects(node)) return false;
   if (node.opacity !== 1) return false;
@@ -211,6 +214,8 @@ export function isRedundantFrame(node: RuleNode): boolean {
   if (parent.type === 'GROUP') return true;
   if (parent.type === 'FRAME' || parent.type === 'COMPONENT') {
     if (parent.layoutMode === 'NONE') return true;
+    // Dissolving into a grid would drop the child's cell placement.
+    if (parent.layoutMode === 'GRID') return false;
 
     // v2 path: auto-layout parent. Only safe when the collapse is provably lossless
     // — the child must already fill the wrapper exactly so no reflow occurs, and
