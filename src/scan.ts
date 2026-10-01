@@ -50,6 +50,12 @@ export function countDescendants(node: RuleNode): number {
 // Each such check below is explicitly guarded: it only fires on leaf nodes or
 // on containers that are proven to clip their children to nothing.
 
+// Figma's default blend for groups and frames is PASS_THROUGH, which is visually
+// neutral. Treating only NORMAL as neutral made the group rules almost never fire.
+function isNeutralBlend(mode: string | undefined): boolean {
+  return !mode || mode === 'NORMAL' || mode === 'PASS_THROUGH';
+}
+
 function scanNodeInto(node: RuleNode, issues: Issue[]): void {
   // Organisational containers — pass through to children without flagging the
   // container itself. SECTION is a file-organisation tool; COMPONENT_SET wraps variants.
@@ -218,7 +224,7 @@ function scanNodeInto(node: RuleNode, issues: Issue[]): void {
     !node.isMask &&
     !node.children[0].isMask &&
     node.opacity === 1 &&
-    (!node.blendMode || node.blendMode === 'NORMAL') &&
+    isNeutralBlend(node.blendMode) &&
     !hasEffects(node)
   ) {
     issues.push({
@@ -283,7 +289,7 @@ function scanNodeInto(node: RuleNode, issues: Issue[]): void {
     !node.isMask &&
     !node.children.some((c) => c.isMask) &&
     node.opacity === 1 &&
-    (!node.blendMode || node.blendMode === 'NORMAL') &&
+    isNeutralBlend(node.blendMode) &&
     !hasEffects(node)
   ) {
     issues.push({

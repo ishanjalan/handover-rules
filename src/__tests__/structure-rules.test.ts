@@ -324,3 +324,46 @@ describe('GRID layout frames are never dissolved', () => {
     expect(isRedundantFrame(wrapper)).toBe(false);
   });
 });
+
+describe('isRedundantFrame — fixed-width wrapper in auto layout (Connecting services card)', () => {
+  // "BO & bus type" (FILL row) > "BO Name" (FIXED 166, HUG tall) > text (FILL width).
+  function build(wrapperH: string, textH: string, wrapperW = 166) {
+    const text = ruleNode({
+      id: 't', type: 'TEXT', x: 0, y: 0, width: wrapperW, height: 20,
+      layoutSizingHorizontal: textH, layoutSizingVertical: 'HUG',
+    });
+    const wrapper = ruleNode({
+      id: 'w', layoutMode: 'HORIZONTAL', children: [text], x: 0, y: 0, width: wrapperW, height: 20,
+      layoutSizingHorizontal: wrapperH, layoutSizingVertical: 'HUG',
+    });
+    text.parent = wrapper;
+    const row = ruleNode({ id: 'r', layoutMode: 'HORIZONTAL', width: 222, height: 20, children: [wrapper] });
+    wrapper.parent = row;
+    return wrapper;
+  }
+
+  test('FIXED wrapper around a FILL text is NOT redundant (text would collapse to 56px)', () => {
+    expect(isRedundantFrame(build('FIXED', 'FILL'))).toBe(false);
+  });
+
+  test('FIXED wrapper around a HUG text is NOT redundant', () => {
+    expect(isRedundantFrame(build('FIXED', 'HUG'))).toBe(false);
+  });
+
+  test('FILL wrapper around a FILL text is still cleaned up, as a passthrough (Bus 2 row)', () => {
+    expect(isPassthroughFrame(build('FILL', 'FILL', 222))).toBe(true);
+  });
+});
+
+describe('isRedundantFrame — auto-layout wrapper with FILL child outside auto layout', () => {
+  test('false: the FILL child would freeze at a stale size', () => {
+    const child = ruleNode({ id: 'c', x: 0, y: 0, width: 100, height: 100, layoutSizingHorizontal: 'FILL' });
+    const wrapper = ruleNode({
+      id: 'w', layoutMode: 'HORIZONTAL', children: [child], x: 10, y: 10, width: 100, height: 100,
+    });
+    child.parent = wrapper;
+    const parent = ruleNode({ id: 'p', layoutMode: 'NONE', width: 400, height: 400, children: [wrapper] });
+    wrapper.parent = parent;
+    expect(isRedundantFrame(wrapper)).toBe(false);
+  });
+});

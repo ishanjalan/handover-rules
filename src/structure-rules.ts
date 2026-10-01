@@ -172,8 +172,12 @@ function isLosslessInAutoLayout(frame: RuleNode): boolean {
   const cvS = child.layoutSizingVertical;
   if (!chS || !cvS) return false;
 
+  // A FIXED wrapper owns the width. A FILL/HUG child inside it resolves against that
+  // width; once the wrapper is gone, setting the child FIXED keeps only the child's
+  // stale stored size (e.g. a FILL text that last measured 56px), so the content
+  // reflows. Only a child that is already FIXED on that axis survives unchanged.
   const axisSafe = (w: string, c: string): boolean =>
-    w === 'FIXED' ? true : w === 'HUG' ? c === 'HUG' || c === 'FIXED' : c === 'FILL';
+    w === 'FIXED' ? c === 'FIXED' : w === 'HUG' ? c === 'HUG' || c === 'FIXED' : c === 'FILL';
   if (!axisSafe(wh ?? 'HUG', chS) || !axisSafe(wv ?? 'HUG', cvS)) return false;
 
   return true;
@@ -209,6 +213,13 @@ export function isRedundantFrame(node: RuleNode): boolean {
 
   const parent = node.parent;
   if (!parent) return false;
+
+  // An auto-layout wrapper that sizes a FILL child: outside auto layout the child cannot
+  // fill anything, so it freezes at whatever stale size it last stored.
+  if (node.layoutMode !== 'NONE') {
+    const c = node.children[0];
+    if (c.layoutSizingHorizontal === 'FILL' || c.layoutSizingVertical === 'FILL') return false;
+  }
 
   // v1 path: GROUP or non-auto-layout container — child keeps absolute geometry.
   if (parent.type === 'GROUP') return true;

@@ -258,3 +258,19 @@ describe('findDuplicateSiblings', () => {
     expect(findDuplicateSiblings(root)).toHaveLength(0);
   });
 });
+
+describe('scanStructure — default PASS_THROUGH groups', () => {
+  test("Figma's default group blend mode (PASS_THROUGH) is treated as neutral", () => {
+    const child = ruleNode({ id: 'c', type: 'RECTANGLE', fills: [fill()] });
+    const group = ruleNode({ id: 'g', type: 'GROUP', blendMode: 'PASS_THROUGH', children: [child] });
+    child.parent = group;
+    expect(scanStructure(group).map((i) => i.type)).toContain('single-child-group');
+  });
+
+  test('a non-neutral blend mode still protects the group', () => {
+    const child = ruleNode({ id: 'c', type: 'RECTANGLE', fills: [fill()] });
+    const group = ruleNode({ id: 'g', type: 'GROUP', blendMode: 'MULTIPLY', children: [child] });
+    child.parent = group;
+    expect(scanStructure(group).map((i) => i.type)).not.toContain('single-child-group');
+  });
+});
