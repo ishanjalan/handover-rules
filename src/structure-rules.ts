@@ -214,26 +214,55 @@ export function isRedundantFrame(node: RuleNode): boolean {
   const parent = node.parent;
   if (!parent) return false;
 
-  // An auto-layout wrapper that sizes a FILL child: outside auto layout the child cannot
-  // fill anything, so it freezes at whatever stale size it last stored.
-  if (node.layoutMode !== 'NONE') {
-    const c = node.children[0];
-    if (c.layoutSizingHorizontal === 'FILL' || c.layoutSizingVertical === 'FILL') return false;
+  // v1 path: GROUP or non-auto-layout container — child keeps absolute geometry.
+  if (parent.type === 'GROUP' || ((parent.type === 'FRAME' || parent.type === 'COMPONENT') && parent.layoutMode === 'NONE')) {
+    // An auto-layout wrapper that sizes a FILL child: outside auto layout the child cannot
+    // fill anything, so it freezes at whatever stale size it last stored.
+    if (node.layoutMode !== 'NONE') {
+      const c = node.children[0];
+      if (c.layoutSizingHorizontal === 'FILL' || c.layoutSizingVertical === 'FILL') return false;
+    }
+    return true;
   }
 
-  // v1 path: GROUP or non-auto-layout container — child keeps absolute geometry.
-  if (parent.type === 'GROUP') return true;
   if (parent.type === 'FRAME' || parent.type === 'COMPONENT') {
-    if (parent.layoutMode === 'NONE') return true;
     // Dissolving into a grid would drop the child's cell placement.
     if (parent.layoutMode === 'GRID') return false;
 
-    // v2 path: auto-layout parent. Only safe when the collapse is provably lossless
-    // — the child must already fill the wrapper exactly so no reflow occurs, and
-    // sizing must transfer without the HUG-over-FILL inflation risk.
-    return isLosslessInAutoLayout(node);
+    // v2 path: auto-layout parent. Only when the collapse is provably lossless.
+    return isLosslessInAutoLayout(node) || isAlignedStretchWrapper(node);
   }
   return false;
+}
+
+// A wrapper stretched across its parent's cross axis (FILL) around a child that hugs.
+// With no chrome the wrapper's extra width is invisible, and the child sits where the
+// wrapper's alignment puts it — so dissolving is lossless when that alignment equals the
+// parent's own cross-axis alignment. Only the cross axis qualifies: on the parent's main
+// axis a FILL wrapper absorbs free space and removing it would shift its siblings.
+export function isAlignedStretchWrapper(node: RuleNode): boolean {
+  if (node.type !== 'FRAME' || node.children.length !== 1) return false;
+  if (node.layoutMode !== 'HORIZONTAL' && node.layoutMode !== 'VERTICAL') return false;
+  if (node.layoutPositioning === 'ABSOLUTE' || (node.layoutGrow ?? 0) !== 0) return false;
+
+  const parent = node.parent;
+  if (!parent || parent.type !== 'FRAME') return false;
+  if (parent.layoutMode !== 'HORIZONTAL' && parent.layoutMode !== 'VERTICAL') return false;
+  if (parent.layoutMode === node.layoutMode || parent.layoutWrap === 'WRAP') return false;
+
+  // The parent's cross axis is horizontal when the parent stacks vertically.
+  const crossIsHorizontal = parent.layoutMode === 'VERTICAL';
+  const child = node.children[0];
+  const stretch = crossIsHorizontal ? node.layoutSizingHorizontal : node.layoutSizingVertical;
+  const main = crossIsHorizontal ? node.layoutSizingVertical : node.layoutSizingHorizontal;
+  const childCross = crossIsHorizontal ? child.layoutSizingHorizontal : child.layoutSizingVertical;
+  const childMain = crossIsHorizontal ? child.layoutSizingVertical : child.layoutSizingHorizontal;
+
+  if (stretch !== 'FILL' || main !== 'HUG') return false;
+  if (!childCross || !childMain || childCross === 'FILL' || childMain === 'FILL') return false;
+
+  const a = node.primaryAxisAlignItems;
+  return !!a && a === parent.counterAxisAlignItems && (a === 'MIN' || a === 'CENTER' || a === 'MAX');
 }
 
 // A node is out-of-bounds when it sits inside a clipping frame but lies

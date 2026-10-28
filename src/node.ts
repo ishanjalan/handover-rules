@@ -41,6 +41,10 @@ export interface RuleNode {
   layoutSizingHorizontal?: 'FIXED' | 'HUG' | 'FILL' | string;
   layoutSizingVertical?: 'FIXED' | 'HUG' | 'FILL' | string;
   layoutPositioning?: 'AUTO' | 'ABSOLUTE' | string;
+  layoutGrow?: number;
+  layoutWrap?: 'NO_WRAP' | 'WRAP' | string;
+  primaryAxisAlignItems?: 'MIN' | 'CENTER' | 'MAX' | 'SPACE_BETWEEN' | string;
+  counterAxisAlignItems?: 'MIN' | 'CENTER' | 'MAX' | 'BASELINE' | string;
   paddingTop: number;
   paddingRight: number;
   paddingBottom: number;

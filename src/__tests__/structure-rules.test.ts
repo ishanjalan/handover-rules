@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import {
   hasVisibleFill, hasStroke, hasEffects, hasOnlyTransparentFills,
-  isPassthroughFrame, isWrapperFrame, isRedundantFrame, isCompletelyOutOfBounds,
+  isPassthroughFrame, isWrapperFrame, isRedundantFrame, isAlignedStretchWrapper, isCompletelyOutOfBounds,
   isDetachedInstance,
 } from '../structure-rules.ts';
 import { ruleNode, withParent, fill, effect } from './factories.ts';
@@ -365,5 +365,71 @@ describe('isRedundantFrame — auto-layout wrapper with FILL child outside auto 
     const parent = ruleNode({ id: 'p', layoutMode: 'NONE', width: 400, height: 400, children: [wrapper] });
     wrapper.parent = parent;
     expect(isRedundantFrame(wrapper)).toBe(false);
+  });
+});
+
+describe('isRedundantFrame — FILL guard only applies outside auto layout', () => {
+  // wrapper (H, FILL width) > child (FILL width) inside a VERTICAL parent: lossless.
+  test('FILL wrapper + FILL child inside an auto-layout parent is still dissolved', () => {
+    const child = ruleNode({ id: 'c', x: 0, y: 0, width: 200, height: 20, layoutSizingHorizontal: 'FILL', layoutSizingVertical: 'HUG' });
+    const wrapper = ruleNode({
+      id: 'w', layoutMode: 'HORIZONTAL', children: [child], width: 200, height: 20,
+      layoutSizingHorizontal: 'FILL', layoutSizingVertical: 'HUG',
+    });
+    child.parent = wrapper;
+    const parent = ruleNode({ id: 'p', layoutMode: 'VERTICAL', width: 200, height: 100, children: [wrapper] });
+    wrapper.parent = parent;
+    expect(isRedundantFrame(wrapper)).toBe(true);
+  });
+});
+
+describe('isAlignedStretchWrapper', () => {
+  function build(over: { wrapperAlign?: string; parentAlign?: string; childH?: string; wrapperMain?: string } = {}) {
+    const child = ruleNode({
+      id: 'c', width: 80, height: 20,
+      layoutSizingHorizontal: over.childH ?? 'HUG', layoutSizingVertical: 'HUG',
+    });
+    const wrapper = ruleNode({
+      id: 'w', layoutMode: 'HORIZONTAL', children: [child], width: 300, height: 20,
+      layoutSizingHorizontal: 'FILL', layoutSizingVertical: over.wrapperMain ?? 'HUG',
+      primaryAxisAlignItems: over.wrapperAlign ?? 'MIN',
+    });
+    child.parent = wrapper;
+    const parent = ruleNode({
+      id: 'p', layoutMode: 'VERTICAL', width: 300, height: 100, children: [wrapper],
+      counterAxisAlignItems: over.parentAlign ?? 'MIN',
+    });
+    wrapper.parent = parent;
+    return wrapper;
+  }
+
+  test('true: FILL-width wrapper around a hugging child, alignments match (MIN/MIN)', () => {
+    const w = build();
+    expect(isAlignedStretchWrapper(w)).toBe(true);
+    expect(isRedundantFrame(w)).toBe(true);
+  });
+
+  test('false when the alignments differ — the child would jump', () => {
+    expect(isAlignedStretchWrapper(build({ wrapperAlign: 'CENTER', parentAlign: 'MIN' }))).toBe(false);
+  });
+
+  test('false when the child is FILL (that case belongs to the lossless rule)', () => {
+    expect(isAlignedStretchWrapper(build({ childH: 'FILL' }))).toBe(false);
+  });
+
+  test('false when the wrapper is not HUG on the parent main axis', () => {
+    expect(isAlignedStretchWrapper(build({ wrapperMain: 'FIXED' }))).toBe(false);
+  });
+
+  test('false on the parent MAIN axis: a FILL wrapper there absorbs free space', () => {
+    const child = ruleNode({ id: 'c', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG' });
+    const wrapper = ruleNode({
+      id: 'w', layoutMode: 'VERTICAL', children: [child],
+      layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'FILL', primaryAxisAlignItems: 'MIN',
+    });
+    child.parent = wrapper;
+    const parent = ruleNode({ id: 'p', layoutMode: 'VERTICAL', children: [wrapper], counterAxisAlignItems: 'MIN' });
+    wrapper.parent = parent;
+    expect(isAlignedStretchWrapper(wrapper)).toBe(false); // same direction as parent
   });
 });
